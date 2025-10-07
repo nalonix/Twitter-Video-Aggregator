@@ -15,6 +15,7 @@ Small utility to fetch liked tweets that contain videos and forward them to a Te
 - Dependencies: requests, requests-oauthlib, python-dotenv, mongoengine, telepot, sumy (see imports in files)
 
 ## Setup
+🚨 Currently variables are only set in constants, and imported as variable. Setup env variables if you would like.
 1. Copy [env.example](env.example) -> `.env` and fill credentials (Telegram token, MongoDB URI, Twitter API keys).
 2. Remove secrets from [constants.py](constants.py) and prefer environment variables. `.gitignore` already excludes `.env` and `constants*`.
 3. Install deps:
