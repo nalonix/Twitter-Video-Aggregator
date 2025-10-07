@@ -1,0 +1,7 @@
+constants*
+liked_vids*
+.env
+__pycache__/
+*.pyc
+venv/
+video_logs.db
