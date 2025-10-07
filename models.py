@@ -1,4 +1,4 @@
-from mongoengine import Document, StringField, FloatField, IntField, ListField, ReferenceField, DateTimeField
+from mongoengine import Document, StringField, BooleanField, FloatField, IntField, ListField, ReferenceField, DateTimeField
 from datetime import datetime, timezone
 
 class Tag(Document):
@@ -39,3 +39,25 @@ class Video(Document):
     title = StringField()
     description = StringField()
     preview = StringField()
+
+
+class LikedVideoDump(Document):
+    """
+    Temporary storage for liked video data fetched from the X/Twitter API.
+    A simple dump to collect all paginated results before processing.
+    """
+    tweet_id = StringField(required=True, unique=True)
+    tweet_url = StringField()
+    username = StringField(required=True)
+    text = StringField()
+    video_url = StringField(required=True)
+    preview = StringField()
+    grabbed = BooleanField(default=False)  # <-- NEW FIELD
+    tags = ListField(StringField()) # Store tags as simple strings here
+    
+    # Metadata for tracking when it was collected
+    collected_at = DateTimeField(default=datetime.now(timezone.utc))
+
+    meta = {
+        'collection': 'liked_video_dump'
+    }
