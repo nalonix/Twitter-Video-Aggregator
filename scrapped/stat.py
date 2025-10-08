@@ -1,21 +1,36 @@
-import csv
+import pandas as pd
 
-# Path to your CSV file
-csv_file = "EightK DB Main.csv"
+# Load the cleaned CSV
+df = pd.read_csv("Cleaned.csv")
 
-# Column to check
-column_name = "video_url"
+# Drop rows missing video_url or duration (if any slipped through)
+df = df.dropna(subset=["video_url", "video_duration"])
 
-blank_count = 0
-total_rows = 0
+# --- 1️⃣ Top 5 most common tags ---
+all_tags = df["tags"].dropna().str.split(",").explode().str.strip().str.lower()
+top_tags = all_tags.value_counts().head(5)
 
-with open(csv_file, newline='', encoding='utf-8') as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        total_rows += 1
-        if not row[column_name].strip():
-            blank_count += 1
+# --- 2️⃣ How many posts have at least one tag ---
+tagged_posts = df["tags"].notna().sum()
 
-print(f"Total rows: {total_rows}")
-print(f"Rows with blank '{column_name}': {blank_count}")
-print(f"Percentage blank: {blank_count / total_rows * 100:.2f}%")
+# --- 3️⃣ Top 5 most common usernames ---
+top_users = df["username"].value_counts().head(5)
+
+# --- 4️⃣ Average, longest, and shortest video durations ---
+avg_duration = df["video_duration"].mean()
+longest = df.loc[df["video_duration"].idxmax()]
+shortest = df.loc[df["video_duration"].idxmin()]
+
+# --- Print results ---
+print("📊 Top 5 Common Tags:")
+print(top_tags, "\n")
+
+print(f"🏷️ Posts with at least one tag: {tagged_posts}\n")
+
+print("👤 Top 5 Common Usernames:")
+print(top_users, "\n")
+
+print(f"⏱️ Average Duration: {avg_duration:.2f} seconds")
+print(f"🏁 Longest Duration: {longest['video_duration']} seconds (Tweet ID: {longest['id']})")
+print(f"⚡ Shortest Duration: {shortest['video_duration']} seconds (Tweet ID: {shortest['id']})")
+
