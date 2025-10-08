@@ -43,14 +43,16 @@ def grab_vids(max_results: int = 40, pagination_token: Optional[str] = None) -> 
             print(f"⚠️ Rate limit reached. Sleeping for {wait_sec} seconds.")
             time.sleep(wait_sec)
             
-            return get_liked_videos(max_results, pagination_token)
+            return grab_vids(max_results, pagination_token)
 
         res.raise_for_status()
         data = res.json()
+        
 
         videos = extract_video_urls(data)
         next_token = data.get("meta", {}).get("next_token")
         print(f"🎞️ Found {len(videos)} video tweets.")
+        print("🌄 Videos: ", videos)
         return {"videos": videos, "next_token": next_token}
 
     except Exception as e:

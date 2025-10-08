@@ -52,10 +52,8 @@ class LikedVideoDump(Document):
     text = StringField()
     video_url = StringField(required=True)
     preview = StringField()
-    grabbed = BooleanField(default=False)  # <-- NEW FIELD
-    tags = ListField(StringField()) # Store tags as simple strings here
-    
-    # Metadata for tracking when it was collected
+    grabbed = BooleanField(default=False)
+    tags = ListField(StringField()) 
     collected_at = DateTimeField(default=datetime.now(timezone.utc))
 
     meta = {

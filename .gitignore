@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 venv/
 video_logs.db
+test.py
