@@ -46,7 +46,8 @@ class LikedVideoDump(Document):
     Temporary storage for liked video data fetched from the X/Twitter API.
     A simple dump to collect all paginated results before processing.
     """
-    tweet_id = StringField(required=True, unique=True)
+    liked_entity_id = StringField(required=True, unique=True)
+    tweet_id = StringField(required=True)
     tweet_url = StringField()
     username = StringField(required=True)
     text = StringField()

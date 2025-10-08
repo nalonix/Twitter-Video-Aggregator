@@ -6,3 +6,5 @@ __pycache__/
 venv/
 video_logs.db
 test.py
+scrapped/*.csv
+scrapped/response.json
