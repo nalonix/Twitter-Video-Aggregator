@@ -5,9 +5,6 @@ import time
 from get_liked_videos import get_liked_videos
 from send_x_videos import send_x_videos
 
-#temp
-from liked_vids import liked_vid
-
 
 if __name__ == "__main__":
     liked_data = get_liked_videos(max_results=30)

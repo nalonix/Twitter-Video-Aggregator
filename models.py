@@ -1,5 +1,9 @@
-from mongoengine import Document, StringField, BooleanField, FloatField, IntField, ListField, ReferenceField, DateTimeField
+from mongoengine import (
+    Document, StringField, BooleanField, FloatField, IntField, 
+    ListField, ReferenceField, DateTimeField
+)
 from datetime import datetime, timezone
+
 
 class Tag(Document):
     name = StringField(required=True, unique=True)
@@ -7,6 +11,7 @@ class Tag(Document):
     total_views = IntField(default=0)
     total_size_mb = FloatField(default=0.0)
     last_used_at = DateTimeField(default=datetime.now(timezone.utc))
+
 
 class TrialLog(Document):
     """
@@ -21,42 +26,44 @@ class TrialLog(Document):
     channel_message_id = StringField()         # Stores the message_id in the Telegram channel
     created_at = DateTimeField(default=datetime.now(timezone.utc))
 
+
 class Video(Document):
     """
     One entry per video (unique by tweet_id or tweet_url).
+    Stores both scraped and liked videos.
     """
-    video_id = StringField(required=True, unique=True)  # Use tweet_id
+    video_id = StringField(required=True, unique=True)  # tweet_id
     uploader_username = StringField(required=True)
+    uploader_display_name = StringField()
+    
+    # Relations
     tags = ListField(ReferenceField(Tag))
-    duration_seconds = FloatField(default=0)
-    size_mb = FloatField(default=0)
     trials = ListField(ReferenceField(TrialLog))
-    created_at = DateTimeField(default=datetime.now(timezone.utc))
+
+    # Video info
+    duration_seconds = FloatField(default=0)
+    video_duration = FloatField(default=0)  # kept for clarity from liked dump
+    size_mb = FloatField(default=0)
+    video_url = StringField()
+    media_urls = ListField(StringField())
+    thumbnail_url = StringField()
     completed_at = DateTimeField()
     
-    # Tweet-related info
+    # Tweet info
+    tweet_type = StringField()
     tweet_url = StringField()
     title = StringField()
     description = StringField()
-    preview = StringField()
-
-
-class LikedVideoDump(Document):
-    """
-    Temporary storage for liked video data fetched from the X/Twitter API.
-    A simple dump to collect all paginated results before processing.
-    """
-    liked_entity_id = StringField(required=True, unique=True)
-    tweet_id = StringField(required=True)
-    tweet_url = StringField()
-    username = StringField(required=True)
     text = StringField()
-    video_url = StringField(required=True)
-    preview = StringField()
-    grabbed = BooleanField(default=False)
-    tags = ListField(StringField()) 
-    collected_at = DateTimeField(default=datetime.now(timezone.utc))
+    source = StringField()
+    conversation_id_str = StringField()
+    retweet_count = IntField(default=0)
+    favorite_count = IntField(default=0)
+    view_count = IntField(default=0)
 
-    meta = {
-        'collection': 'liked_video_dump'
-    }
+    # Analysis/metadata
+    keywords = ListField(StringField())
+    fake_timestamp = IntField()
+    fake_date = StringField()
+        
+    created_at = DateTimeField(default=datetime.now(timezone.utc))
