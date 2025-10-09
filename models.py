@@ -56,7 +56,7 @@ class Video(Document):
     description = StringField()
     text = StringField()
     source = StringField()
-    conversation_id_str = StringField()
+    conversation_id_str = FloatField()
     retweet_count = IntField(default=0)
     favorite_count = IntField(default=0)
     view_count = IntField(default=0)

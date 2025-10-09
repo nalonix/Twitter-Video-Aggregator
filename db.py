@@ -7,10 +7,10 @@ load_dotenv()
 
 # MONGODB_URI = os.getenv("MONGODB_URI")
 MONGODB_URI = MONGODB_URI
+DB_NAME = "main"
 
 if not MONGODB_URI:
     raise ValueError("MONGODB_URI not set in .env")
 
-# connect() automatically sets up the default alias
-connect(host=MONGODB_URI)
+connect(db=DB_NAME, host=MONGODB_URI)
 print("✅ MongoDB connected successfully!")
