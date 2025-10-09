@@ -20,7 +20,7 @@ def generate_title_heavy(text: str, max_keywords: int = 3) -> str:
         str: Generated title
     """
     if not text or not text.strip():
-        return "Untitled"
+        return "No title"
 
     # Remove URLs
     clean_text = re.sub(r"http\S+|https\S+|www\.\S+", "", text)

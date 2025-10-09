@@ -13,10 +13,10 @@ def generate_title(text: str, max_words: int = 8) -> str:
     """
     # Ensure text is string
     if text is None or pd.isna(text):
-        return "Untitled"
+        return "No title"
     text = str(text).strip()
     if not text:
-        return "Untitled"
+        return "No title"
 
     # Clean text
     text = re.sub(r"http\S+|https\S+|www\.\S+", "", text)  # URLs
@@ -24,7 +24,7 @@ def generate_title(text: str, max_words: int = 8) -> str:
     text = re.sub(r"\s+", " ", text).strip()  # extra spaces/newlines
 
     if not text:
-        return "Untitled"
+        return "No title"
 
     doc = nlp(text)
 
