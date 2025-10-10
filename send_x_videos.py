@@ -5,9 +5,9 @@ import time
 import telepot
 from generate_title import generate_title
 from constants import TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, PRIVATE_CHANNEL_ID, PARSE_MODE
+from bot import bot
 
 
-bot = telepot.Bot(TELEGRAM_TOKEN)
 
 
 def send_x_videos(video_info: dict, mechanism_name: str = "mechanism_1"):

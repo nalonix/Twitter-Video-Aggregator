@@ -1,13 +1,17 @@
 import json
+from constants import PRIVATE_CHANNEL_ID, TELEGRAM_CHAT_ID
 from db import *  # establishes connection
 import time
 from scrapped.grab_vids import grab_vids
 from send_x_videos import send_x_videos
 
+from bot import bot
+
 if __name__ == "__main__":
     RUNS = 4
-    MAX_RESULTS = 3
-    BREAK_INTERVAL = 5 * 60  # 5 minutes
+    
+    MAX_RESULTS = 500
+    BREAK_INTERVAL = 3 * 60  # 3 minutes
     BREAK_DURATION = 30      # 30 seconds
 
     for run in range(RUNS):
@@ -16,10 +20,13 @@ if __name__ == "__main__":
 
         liked_data = grab_vids(max_results=MAX_RESULTS)
 
-        for vid in liked_data:
+        for i, vid in enumerate(liked_data):
             try:
                 send_x_videos(vid)
-                time.sleep(3)  # small delay between sending videos
+                
+                print(f"📈 Progress {((run * MAX_RESULTS + (i + 1)) / (MAX_RESULTS * RUNS)) * 100:.1f}% " f"{run * MAX_RESULTS + (i + 1)}/{MAX_RESULTS * RUNS} | Run {run + 1}/{RUNS}\n")
+
+                time.sleep(2)  # small delay between sending videos
             except Exception as e:
                 print(f"❌ Failed to send video for tweet {vid.get('id')}\nReason: {e}")
 
@@ -31,4 +38,7 @@ if __name__ == "__main__":
                 start_time = time.time()  # reset timer after break
 
         print(f"✅ Run {run + 1} complete.\n")
+        
+    bot.sendMessage(PRIVATE_CHANNEL_ID, "✅ Run complete.")
+    bot.sendMessage(TELEGRAM_CHAT_ID, "✅ Run complete.")
 
