@@ -10,8 +10,8 @@ from bot import bot
 if __name__ == "__main__":
     RUNS = 4
     
-    MAX_RESULTS = 500
-    BREAK_INTERVAL = 3 * 60  # 3 minutes
+    MAX_RESULTS = 100
+    BREAK_INTERVAL = 4 * 60  # 3 minutes
     BREAK_DURATION = 30      # 30 seconds
 
     for run in range(RUNS):

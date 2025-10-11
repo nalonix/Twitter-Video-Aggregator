@@ -2,8 +2,8 @@ import pandas as pd
 import uuid
 from pathlib import Path
 
-INPUT_FILE = Path("Cleaned.csv")
-OUTPUT_FILE = Path("Cleaned.csv")
+INPUT_FILE = Path("New Cleaned.csv")
+OUTPUT_FILE = Path("New Cleaned.csv")
 
 def assign_unique_ids(input_path, output_path):
     # Load CSV
