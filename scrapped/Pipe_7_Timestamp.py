@@ -33,4 +33,4 @@ def continue_timestamps(old_csv, new_csv, output_path):
     print(f"🕓 Bottom row: {df_final['fake_date'].iloc[-1]}, Top row: {df_final['fake_date'].iloc[0]}")
 
 # Example usage
-continue_timestamps("Cleaned.csv", "New Cleaned.csv", "New Cleaned.csv")
+continue_timestamps("2 Old Cleaned.csv", "New Cleaned.csv", "New Cleaned.csv")

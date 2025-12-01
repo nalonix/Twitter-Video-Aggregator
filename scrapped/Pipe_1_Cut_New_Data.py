@@ -2,52 +2,52 @@ import pandas as pd
 
 # File paths
 file1_path = "New Data.csv"
-file2_path = "Cleaned.csv"
+file2_path = "7 Old Cleaned.csv"
 output_path = "New Cleaned.csv"
 
 # Load both CSVs
 df1 = pd.read_csv(file1_path)
 df2 = pd.read_csv(file2_path)
 
-# Take the first 2 rows from file2
-rows_to_find = df2.head(2)[["id", "created_at"]].reset_index(drop=True)
+# Take the first 2 rows from file2 🤖
+rows_to_find = df2.head(5)[["id", "created_at"]].reset_index(drop=True)
 
-if len(rows_to_find) < 2:
-    raise ValueError("⚠️ file2 must have at least two rows to compare.")
+print("Rows to find:", rows_to_find)
 
+if len(rows_to_find) < 5:
+    raise ValueError("⚠️ file2 must have at least 5 rows to compare.")
+
+matches = []
 # Extract values for matching
 first_id, first_created_at = rows_to_find.loc[0, ["id", "created_at"]]
 second_id, second_created_at = rows_to_find.loc[1, ["id", "created_at"]]
 
-# Find where the first row matches in file1
-matches = df1[
-    (df1["id"] == first_id) &
-    (df1["created_at"] == first_created_at)
-].index
+for idx, row in rows_to_find.iterrows():
+    print(f"Looking for row {idx + 1}: id={row['id']}, created_at={row['created_at']}")
+    matched_entry = df1.index[(df1["id"] == row["id"]) & (df1["created_at"] == row["created_at"])].tolist()
+    matches.append(matched_entry[0] if matched_entry else None)
+    
+    
+# Check there's at least 3 matches 🤖
+if matches.count(None) > 2:
+    raise ValueError("❌ Less than 3 matches found between the two files.")
 
-if len(matches) == 0:
-    raise ValueError("❌ First row from file2 not found in file1.")
+# Verify that matches are close together (verifying integrity)
+# Distribution can't be more than 5 (first fetched number of rows) 🤖
+distribution = max(filter(lambda x: x is not None, matches)) - min(filter(lambda x: x is not None, matches))
+if distribution > 5:
+    raise ValueError("❌ Matches found are too far apart, data integrity check failed.")
 
-# Check for consecutive second-row match
-cut_index = None
-for i in matches:
-    if i + 1 < len(df1):
-        next_row = df1.loc[i + 1]
-        if (
-            next_row["id"] == second_id and
-            next_row["created_at"] == second_created_at
-        ):
-            cut_index = i + 1
-            break
+print("Matches found:", matches)
 
-if cut_index is None:
-    raise ValueError("❌ Could not find both rows consecutively in file1.")
+cut_index = min(filter(lambda x: x is not None, matches))
 
-# Slice file1 up to and including the second matching row
-df_cut = df1.iloc[:cut_index + 1]
+print(f"✂️ Cutting file1 up to index {cut_index}")
+
+# Slice file1 up to and including the later of the two matches
+df_cut = df1.iloc[:cut_index]
 
 # Save the cut portion to a new CSV
 df_cut.to_csv(output_path, index=False)
 
-print(f"✅ Match found at index {cut_index-1}-{cut_index}.")
 print(f"📁 New file saved as: {output_path}")

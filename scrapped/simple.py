@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load CSV
-df = pd.read_csv("Cleaned.csv")
+df = pd.read_csv("New Cleaned.csv")
 
 # Count entries
 num_entries = len(df)

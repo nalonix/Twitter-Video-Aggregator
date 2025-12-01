@@ -1,5 +1,6 @@
 from mongoengine import (
-    Document, StringField, BooleanField, FloatField, IntField, 
+    Document, EmbeddedDocument, EmbeddedDocumentField,
+    StringField, BooleanField, FloatField, IntField,
     ListField, ReferenceField, DateTimeField
 )
 from datetime import datetime, timezone
@@ -67,3 +68,18 @@ class Video(Document):
     fake_date = StringField()
         
     created_at = DateTimeField(default=datetime.now(timezone.utc))
+
+
+
+class RelatedTagEntry(EmbeddedDocument):
+    tag_ref = ReferenceField(Tag, required=True)
+    weight = IntField(required=True, default=1)
+    tag_name = StringField(required=True)
+
+
+class TagRelationship(Document):
+    primary_tag_ref = ReferenceField(Tag, required=True, unique=True)
+    related_tags = ListField(EmbeddedDocumentField(RelatedTagEntry))
+    last_calculated_at = DateTimeField(default=datetime.now(timezone.utc))
+
+    meta = {'collection': 'tag_relationship', 'indexes': ['primary_tag_ref']}
