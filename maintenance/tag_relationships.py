@@ -1,8 +1,8 @@
-from db import *
+import core.db  # noqa: F401  establishes connection
 import itertools
 from collections import defaultdict
 from datetime import datetime, timezone
-from models import RelatedTagEntry, Tag, TagRelationship, Video
+from core.models import RelatedTagEntry, Tag, TagRelationship, Video
 
 # --- Configuration ---
 TOP_N_RELATIONSHIPS = 5

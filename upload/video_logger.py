@@ -1,8 +1,8 @@
 # video_logger.py
 from datetime import datetime, timezone
 from typing import List, Dict
-from generate_title import generate_title
-from models import Video, Tag, TrialLog
+from core.generate_title import generate_title
+from core.models import Video, Tag, TrialLog
 
 
 # ----------------------
@@ -45,21 +45,27 @@ def create_or_get_video(video_info: Dict, username: str, tags: List[Tag]) -> Vid
         for tag in tags:
             if str(tag.id) not in existing_tag_ids:
                 video.tags.append(tag)
+        # Keep video_url populated so failed uploads can be retried from the DB
+        if not video.video_url and video_info.get("video_url"):
+            video.video_url = video_info.get("video_url")
         video.save()
         return video
 
     # Create new entry
+    # video_url and uploader_display_name are stored up-front (not only on success)
+    # so retry_failed_uploads.py can resend failures without a backfill.
     text_content = video_info.get("text", "")
     new_video = Video(
         video_id=video_id,
         uploader_username=username,
-        uploader_display_name=video_info.get("uploader_display_name", ""),
-        tweet_url=video_info.get("tweet_url"),
+        uploader_display_name=video_info.get("user_display_name") or username,
+        tweet_url=video_info.get("tweet_url") or f"https://x.com/{username}/status/{video_id}",
         title=generate_title(text_content),
         description=text_content,
         text=text_content,
-        source=video_info.get("source", "unknown"),
+        source=str(video_info.get("source") or ""),
         tags=tags,
+        video_url=video_info.get("video_url"),
         media_urls=video_info.get("media_urls", []),
         thumbnail_url=video_info.get("thumbnail_url", ""),
         tweet_type=video_info.get("tweet_type", ""),
@@ -80,7 +86,10 @@ def log_trial(
     duration: float,
     error_message: str = "",
     telegram_file_id: str = "",
-    channel_message_id: str = ""
+    channel_message_id: str = "",
+    bot_sent: bool = False,
+    channel_sent: bool = False,
+    channel_delivery_method: str = ""
 ) -> TrialLog:
     """Log a single trial attempt for a video."""
     trial = TrialLog(
@@ -89,6 +98,9 @@ def log_trial(
         status=status,
         duration_seconds=duration,
         error_message=error_message,
+        bot_sent=bot_sent,
+        channel_sent=channel_sent,
+        channel_delivery_method=channel_delivery_method,
         telegram_file_id=telegram_file_id,
         channel_message_id=channel_message_id,
     ).save()
@@ -96,70 +108,3 @@ def log_trial(
     video.trials.append(trial)
     video.save()
     return trial
-
-
-# ----------------------
-# High-Level Logging
-# ----------------------
-def log_success(
-    video_info: Dict,
-    username: str,
-    duration: float,
-    size_mb: float,
-    telegram_file_id: str = "",
-    channel_message_id: str = ""
-):
-    """Record a successful download/upload attempt."""
-    tags = get_or_create_tags(video_info.get("tags", []))
-    video = create_or_get_video(video_info, username, tags)
-
-    # Create trial
-    trial = log_trial(
-        video,
-        mechanism_name="mechanism_1",
-        status="completed",
-        duration=duration,
-        telegram_file_id=telegram_file_id,
-        channel_message_id=channel_message_id
-    )
-
-    # Update video metadata
-    video.duration_seconds = duration
-    video.size_mb = size_mb
-    video.completed_at = datetime.now(timezone.utc)
-    video.save()
-
-    # Update tag usage stats
-    for tag in tags:
-        tag.total_videos += 1
-        tag.total_size_mb += size_mb
-        tag.total_views += video.view_count or 0
-        tag.last_used_at = datetime.now(timezone.utc)
-        tag.save()
-
-    print(f"✅ [LOGGED SUCCESS] {video_info.get('tweet_url')} | Trial #{trial.attempt_number}")
-
-
-def log_failure(
-    video_info: Dict,
-    username: str,
-    error: str,
-    duration: float = 0.0,
-    telegram_file_id: str = "",
-    channel_message_id: str = ""
-):
-    """Record a failed attempt."""
-    tags = get_or_create_tags(video_info.get("tags", []))
-    video = create_or_get_video(video_info, username, tags)
-
-    trial = log_trial(
-        video,
-        mechanism_name="mechanism_1",
-        status="failed",
-        duration=duration,
-        error_message=error,
-        telegram_file_id=telegram_file_id,
-        channel_message_id=channel_message_id
-    )
-
-    print(f"⚠️ [LOGGED FAILURE] {video_info.get('tweet_url')} | Trial #{trial.attempt_number} | Error: {error}")

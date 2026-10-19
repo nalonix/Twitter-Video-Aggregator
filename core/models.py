@@ -23,6 +23,9 @@ class TrialLog(Document):
     status = StringField(choices=["ongoing", "completed", "failed"], default="ongoing")
     error_message = StringField()
     duration_seconds = FloatField(default=0.0)
+    bot_sent = BooleanField(default=False)
+    channel_sent = BooleanField(default=False)
+    channel_delivery_method = StringField()
     telegram_file_id = StringField()           # Stores the Telegram file_id
     channel_message_id = StringField()         # Stores the message_id in the Telegram channel
     created_at = DateTimeField(default=datetime.now(timezone.utc))
@@ -48,6 +51,10 @@ class Video(Document):
     video_url = StringField()
     media_urls = ListField(StringField())
     thumbnail_url = StringField()
+
+    # Telegram message IDs for deletion
+    message_id_main = StringField()  # Message ID in the main Telegram chat
+    message_id_private = StringField()  # Message ID in the private channel
     completed_at = DateTimeField()
     
     # Tweet info

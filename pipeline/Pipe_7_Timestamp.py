@@ -1,34 +1,10 @@
 import pandas as pd
-import glob
 import os
-import re
 from datetime import datetime, timedelta, timezone
 
+from common import find_latest_old_cleaned
+
 INTERVAL = timedelta(minutes=5)
-
-def _find_oldest_cleaned_file(directory: str) -> str | None:
-    """
-    Find the file with the largest leading number that matches the pattern:
-    "[number] Old Cleaned.csv" in the given directory. Returns full path or None.
-    """
-    pattern = os.path.join(directory, "* Old Cleaned.csv")
-    candidates = glob.glob(pattern)
-    if not candidates:
-        return None
-
-    max_num = -1
-    selected = None
-    for path in candidates:
-        name = os.path.basename(path)
-        m = re.match(r"^\s*(\d+)\s+Old Cleaned\.csv$", name)
-        if not m:
-            continue
-        num = int(m.group(1))
-        if num > max_num:
-            max_num = num
-            selected = path
-    return selected
-
 
 def continue_timestamps(old_csv: str | None, new_csv: str, output_path: str):
     """
@@ -36,19 +12,13 @@ def continue_timestamps(old_csv: str | None, new_csv: str, output_path: str):
     filling bottom → top (oldest at bottom, newest at top).
 
     If old_csv is None, automatically selects the file named "[largest number] Old Cleaned.csv"
-    in the same directory as this script.
+    in the current (data) directory.
     """
-    base_dir = os.path.dirname(__file__)
-    # Auto-detect old_csv if not provided
     if not old_csv:
-        old_csv = _find_oldest_cleaned_file(base_dir)
+        old_csv = find_latest_old_cleaned()
         if not old_csv:
             raise FileNotFoundError("No '* Old Cleaned.csv' files found to continue timestamps from.")
-        print(f"🔎 Auto-detected oldest cleaned file: {os.path.basename(old_csv)}")
-    else:
-        # If a relative path provided, resolve relative to script dir
-        if not os.path.isabs(old_csv):
-            old_csv = os.path.join(base_dir, old_csv)
+        print(f"🔎 Auto-detected latest cleaned file: {os.path.basename(old_csv)}")
 
     df_old = pd.read_csv(old_csv) if os.path.exists(old_csv) else pd.DataFrame()
     df_new = pd.read_csv(new_csv)
@@ -78,5 +48,6 @@ def continue_timestamps(old_csv: str | None, new_csv: str, output_path: str):
     print(f"🕓 Bottom row: {df_final['fake_date'].iloc[-1]}, Top row: {df_final['fake_date'].iloc[0]}")
 
 
-# Example usage
-continue_timestamps("7 Old Cleaned.csv", "New Cleaned.csv", "New Cleaned.csv")
+if __name__ == "__main__":
+    continue_timestamps(None, "New Cleaned.csv", "New Cleaned.csv")
+

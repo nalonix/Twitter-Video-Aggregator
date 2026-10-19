@@ -1,0 +1,7 @@
+pandas==2.3.3
+mongoengine==0.29.1
+pymongo==4.15.2
+telepot==12.7
+spacy==3.8.7
+yake==0.6.0
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

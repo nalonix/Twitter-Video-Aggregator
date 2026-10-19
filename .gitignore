@@ -1,10 +1,14 @@
+# Secrets
 constants*
-_liked_vids*
+!core/constants.example.py
 .env
+
+# Python
 __pycache__/
 *.pyc
 venv/
-video_logs.db
-test.py
-scrapped/*.csv
+
+# Data & run output (local only)
+*.csv
 scrapped/response.json
+reports/

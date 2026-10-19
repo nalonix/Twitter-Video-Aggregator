@@ -1,8 +1,8 @@
 from pymongo import UpdateOne
 from datetime import datetime, timezone
 from collections import defaultdict
-from models import Tag, Video
-from db import *  # Only if this initializes MongoEngine
+from core.models import Tag, Video
+import core.db  # noqa: F401  establishes connection
 
 
 def ensure_utc(dt):
