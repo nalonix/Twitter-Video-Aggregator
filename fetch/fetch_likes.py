@@ -30,7 +30,7 @@ if sys.platform == "win32":
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from pipeline.common import find_latest_old_cleaned  # noqa: E402
+from pipeline.common import CLUSTER_MIN, CLUSTER_WINDOW, find_cut_index, find_latest_old_cleaned, recent_uploaded_ids  # noqa: E402,E501
 
 CONSTANTS_PATH = ROOT / "core" / "constants.py"
 SCRAPPED_DIR = ROOT / "scrapped"
@@ -58,7 +58,6 @@ PAGE_SIZE = 100
 PAGE_DELAY = 1.5  # seconds between pages, to stay well under the rate limit
 LOOKUP_DELAY = 1.0  # seconds between single-post lookups for linked videos
 DEFAULT_LIMIT = 1000  # safety cap on likes per run, in case the last batch is never found
-ANCHOR_ROWS = 5  # Pipe 1 matches the top 5 rows of the latest "N Old Cleaned.csv"
 
 # Used only if the Likes query can't be found in x.com's JavaScript.
 FALLBACK_QUERY_ID = "aeJWz--kknVBOl7wQ7gh7Q"
@@ -536,14 +535,6 @@ def write_csv(rows: list[dict], path: Path) -> None:
     os.replace(tmp, path)
 
 
-def load_anchor_ids() -> tuple[str | None, set[str]]:
-    path = find_latest_old_cleaned(str(SCRAPPED_DIR))
-    if not path:
-        return None, set()
-    df = pd.read_csv(path, dtype={"id": str}, usecols=["id"], nrows=ANCHOR_ROWS)
-    return os.path.basename(path), set(df["id"].dropna().astype(str))
-
-
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 
@@ -568,9 +559,15 @@ def main() -> int:
         cfg = bootstrap(client, user_id, query_id)
         print(f"🔐 Logged in as user {cfg['user_id']} · Likes query {cfg['likes']['query_id']}", flush=True)
 
-        anchor_file, anchors = (None, set()) if args.all else load_anchor_ids()
+        anchors = set() if args.all else set(recent_uploaded_ids(str(SCRAPPED_DIR)))
+        latest = find_latest_old_cleaned(str(SCRAPPED_DIR))
+        anchor_file = os.path.basename(latest) if latest else None
         if anchors:
-            print(f"⚓ Stopping once the newest {len(anchors)} posts of {anchor_file} are reached", flush=True)
+            print(
+                f"⚓ Stopping once your last uploaded batch ({anchor_file}) is reached: "
+                f"{CLUSTER_MIN} of your {len(anchors)} most recent uploads within {CLUSTER_WINDOW} likes",
+                flush=True,
+            )
         else:
             print("📚 Fetching all likes (no earlier batch to stop at)", flush=True)
 
@@ -579,8 +576,7 @@ def main() -> int:
         seen: set[str] = set()
         linked_cache: dict = {}
         linked_total = 0
-        found: set[str] = set()
-        first_anchor_page = None
+        cut = None
         cursor, page = None, 0
         stopped_early = False
         hit_limit = False
@@ -605,21 +601,27 @@ def main() -> int:
             linked = fill_linked_videos(client, cfg, new_rows, linked_cache)
             linked_total += linked
             rows.extend(new_rows)
-            found |= anchors & {r["id"] for r in new_rows}
 
             videos = sum(1 for r in rows if r["video_url"])
             linked_note = f", {linked} via linked posts" if linked else ""
             print(f"📄 Page {page}: +{len(new_rows)} likes ({len(rows)} total, {videos} with video{linked_note})", flush=True)
 
-            if anchors and found and first_anchor_page is None:
-                first_anchor_page = page
-            if anchors and (found == anchors or (first_anchor_page and page > first_anchor_page)):
-                print(f"⚓ Reached the last uploaded batch ({len(found)}/{len(anchors)} anchor posts found)", flush=True)
-                break
+            if anchors:
+                ids = [r["id"] for r in rows]
+                cut = find_cut_index(ids, anchors)
+                # Fetch a full window past the cut so Pipe 1 sees the same cluster.
+                if cut is not None and len(rows) >= cut + CLUSTER_WINDOW:
+                    matched = sum(1 for x in ids[cut : cut + CLUSTER_WINDOW] if x in anchors)
+                    print(
+                        f"⚓ Reached the last uploaded batch at like #{cut + 1}: {cut} new likes above it "
+                        f"({matched} recent uploads matched nearby)",
+                        flush=True,
+                    )
+                    break
             if not new_rows or not next_cursor or next_cursor == cursor:
                 print("🏁 Reached the end of your likes", flush=True)
                 break
-            if limit and len(rows) >= limit:
+            if limit and len(rows) >= limit and cut is None:
                 del rows[limit:]
                 print(f"🛑 Hit the {limit}-like limit without reaching the last uploaded batch", flush=True)
                 hit_limit = True
@@ -644,25 +646,27 @@ def main() -> int:
         linked_note = f", {linked_total} of them from linked posts" if linked_total else ""
         print(f"✅ Wrote {len(rows)} likes ({videos} with video{linked_note}) to {args.out}", flush=True)
 
-        if hit_limit and anchors and len(found) < len(anchors) - 1:
+        seen_anchors = sum(1 for r in rows if r["id"] in anchors)
+        if hit_limit and anchors and cut is None:
             print(
-                f"❌ Stopped at {limit} likes and only found {len(found)}/{len(anchors)} posts from {anchor_file}, "
-                "so Pipe 1 can't cut this file. Either more than "
+                f"❌ Stopped at {limit} likes without finding your last uploaded batch ({seen_anchors} of your "
+                f"{len(anchors)} most recent uploads seen, none {CLUSTER_MIN} close together), so Pipe 1 can't "
+                "cut this file. Either more than "
                 f"{limit} likes are new (re-run with --limit {limit * 3}), or the last batch's posts are gone "
                 "from your likes (unliked or deleted); check before uploading.",
                 flush=True,
             )
             return 1
-        if stopped_early and anchors and len(found) < len(anchors) - 1:
+        if stopped_early and anchors and cut is None:
             print(
-                f"ℹ️ Stopped before reaching {anchor_file} ({len(found)}/{len(anchors)} anchor posts seen), "
+                f"ℹ️ Stopped before reaching {anchor_file} ({seen_anchors} recent uploads seen), "
                 "so this file isn't ready for Pipe 1. That's fine for a test run.",
                 flush=True,
             )
-        elif anchors and len(found) < len(anchors) - 1:
+        elif anchors and cut is None:
             print(
-                f"⚠️ Only {len(found)}/{len(anchors)} posts from {anchor_file} were found in your likes. "
-                "Pipe 1 needs at least 4; if you unliked them, re-run with --all and check the result.",
+                f"⚠️ Reached the end of your likes without finding your last uploaded batch ({seen_anchors} of "
+                f"your {len(anchors)} most recent uploads seen), so Pipe 1 won't be able to cut this file.",
                 flush=True,
             )
         return 0

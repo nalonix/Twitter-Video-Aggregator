@@ -24,7 +24,7 @@ That's it. Don't export, rename or archive anything by hand; the workflow does t
 
 | Step | Script | What happens |
 |---|---|---|
-| 0 | `fetch/fetch_likes.py` | Downloads your likes (newest first) into **`scrapped/New Data.csv`**, stopping once it reaches the newest posts of the latest `N Old Cleaned.csv`, which are the last batch you uploaded. As a safety cap it stops after 1000 likes (`--limit` changes it); if it gets there without finding the last batch, it fails so the run stops before uploading. On a first run, with no batch yet, it just keeps the newest 1000. If a liked post has no video of its own but links to one (`x.com/<user>/status/<id>/video/<n>`), it looks up that post and uses its video; the row keeps the liked post's id and text. |
+| 0 | `fetch/fetch_likes.py` | Downloads your likes (newest first) into **`scrapped/New Data.csv`**, stopping once it reaches your last uploaded batch (same matching rule as Pipe 1, below). As a safety cap it stops after 1000 likes (`--limit` changes it); if it gets there without finding the last batch, it fails so the run stops before uploading. On a first run, with no batch yet, it just keeps the newest 1000. If a liked post has no video of its own but links to one (`x.com/<user>/status/<id>/video/<n>`), it looks up that post and uses its video; the row keeps the liked post's id and text. |
 | 1 | `pipeline/run_all_pipes.py` | Runs Pipe 1–7 inside `scrapped/` and produces `New Cleaned.csv`, which is then renamed to **`Cleaned.csv`** and validated. If there are 0 new rows, the run stops here. |
 | 2 | `upload/upload_videos.py` | Sends every row of `Cleaned.csv` to the bot chat and forwards it to the archive channel. Each video and attempt is logged to MongoDB, and failures go to `failed_uploads/failed_uploads_<time>.csv`. |
 | — | *(archive)* | Copies `Cleaned.csv` to **`scrapped/<N+1> Old Cleaned.csv`**, which the next run uses as its anchor. |
@@ -58,7 +58,7 @@ All pipes read and write `scrapped/New Cleaned.csv` in place:
 
 | Pipe | Purpose |
 |---|---|
-| `Pipe_1_Cut_New_Data.py` | Finds the top 5 rows of the latest `N Old Cleaned.csv` inside `New Data.csv` (at least 4 must match, close together) and keeps only the rows above them, which are the new likes. |
+| `Pipe_1_Cut_New_Data.py` | Finds where your last uploaded batch starts in `New Data.csv` and keeps only the rows above it, which are the new likes. It looks for your 50 most recently uploaded posts (reading back through older `N Old Cleaned.csv` files if the latest is small) and cuts at the first spot where at least 3 of them appear within 20 rows. Deleted or unliked posts are skipped, and a lone old post you re-liked can't trigger the cut. Any new like that was already uploaded in an earlier batch is dropped. |
 | `Pipe_2_Remove_Empty.py` | Drops rows with no `video_url`, adds them to `empty_url_dump.csv` (those ids are ignored from then on), dedupes by id, and trims columns after `conversation_id_str`. |
 | `Pipe_3_Type_Check_Default.py` | Converts count columns to ints, with blanks becoming 0. |
 | `Pipe_4_Tag.py` | Extracts hashtags into `tags`. |
@@ -66,7 +66,7 @@ All pipes read and write `scrapped/New Cleaned.csv` in place:
 | `Pipe_6_U_IDS.py` | Assigns a `unique_id` (UUID) to each row. |
 | `Pipe_7_Timestamp.py` | Assigns `fake_timestamp`/`fake_date` 5 minutes apart, continuing from the latest `N Old Cleaned.csv`. |
 
-`pipeline/common.py` holds `find_latest_old_cleaned()`, which Pipe 1 and Pipe 7 use to find the anchor file.
+`pipeline/common.py` holds `find_latest_old_cleaned()` (used by Pipe 1 and Pipe 7 to find the latest batch) and the matching rule above (`find_cut_index()`, with `ANCHOR_COUNT`, `CLUSTER_WINDOW` and `CLUSTER_MIN`), shared by Pipe 1 and the fetcher.
 
 ## Running steps on their own
 
