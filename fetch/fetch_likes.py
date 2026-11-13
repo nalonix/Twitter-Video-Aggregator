@@ -5,6 +5,7 @@ in the same 27-column format the pipeline expects. See WORKFLOW.md.
     python -m fetch.fetch_likes                # new likes, down to the last uploaded batch
     python -m fetch.fetch_likes --all          # every like X will return
     python -m fetch.fetch_likes --max-pages 3  # stop after 3 pages (testing)
+    python -m fetch.fetch_likes --limit 3000   # raise the safety cap (default 1000 likes)
 
 Login uses your browser session cookies, X_AUTH_TOKEN and X_CT0 in
 core/constants.py. If X rotates ct0, the new value is saved back there.
@@ -56,6 +57,7 @@ USER_AGENT = (
 PAGE_SIZE = 100
 PAGE_DELAY = 1.5  # seconds between pages, to stay well under the rate limit
 LOOKUP_DELAY = 1.0  # seconds between single-post lookups for linked videos
+DEFAULT_LIMIT = 1000  # safety cap on likes per run, in case the last batch is never found
 ANCHOR_ROWS = 5  # Pipe 1 matches the top 5 rows of the latest "N Old Cleaned.csv"
 
 # Used only if the Likes query can't be found in x.com's JavaScript.
@@ -549,9 +551,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Download your X likes into scrapped/New Data.csv")
     parser.add_argument("--all", action="store_true", help="fetch every like, ignoring the last uploaded batch")
     parser.add_argument("--max-pages", type=int, default=0, help="stop after this many pages (0 = no limit)")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help=f"stop after this many likes (default {DEFAULT_LIMIT}; no cap with --all; 0 = no cap)",
+    )
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output CSV (default: scrapped/New Data.csv)")
     parser.add_argument("--save-raw", action="store_true", help="also save the raw API pages to scrapped/response.json")
     args = parser.parse_args()
+    limit = args.limit if args.limit is not None else (0 if args.all else DEFAULT_LIMIT)
 
     try:
         auth_token, ct0, user_id, query_id = load_credentials()
@@ -574,6 +583,7 @@ def main() -> int:
         first_anchor_page = None
         cursor, page = None, 0
         stopped_early = False
+        hit_limit = False
 
         while True:
             page += 1
@@ -609,6 +619,11 @@ def main() -> int:
             if not new_rows or not next_cursor or next_cursor == cursor:
                 print("🏁 Reached the end of your likes", flush=True)
                 break
+            if limit and len(rows) >= limit:
+                del rows[limit:]
+                print(f"🛑 Hit the {limit}-like limit without reaching the last uploaded batch", flush=True)
+                hit_limit = True
+                break
             if args.max_pages and page >= args.max_pages:
                 print(f"⏹ Stopped after {page} pages (--max-pages)", flush=True)
                 stopped_early = True
@@ -629,6 +644,15 @@ def main() -> int:
         linked_note = f", {linked_total} of them from linked posts" if linked_total else ""
         print(f"✅ Wrote {len(rows)} likes ({videos} with video{linked_note}) to {args.out}", flush=True)
 
+        if hit_limit and anchors and len(found) < len(anchors) - 1:
+            print(
+                f"❌ Stopped at {limit} likes and only found {len(found)}/{len(anchors)} posts from {anchor_file}, "
+                "so Pipe 1 can't cut this file. Either more than "
+                f"{limit} likes are new (re-run with --limit {limit * 3}), or the last batch's posts are gone "
+                "from your likes (unliked or deleted); check before uploading.",
+                flush=True,
+            )
+            return 1
         if stopped_early and anchors and len(found) < len(anchors) - 1:
             print(
                 f"ℹ️ Stopped before reaching {anchor_file} ({len(found)}/{len(anchors)} anchor posts seen), "

@@ -24,7 +24,7 @@ That's it. Don't export, rename or archive anything by hand; the workflow does t
 
 | Step | Script | What happens |
 |---|---|---|
-| 0 | `fetch/fetch_likes.py` | Downloads your likes (newest first) into **`scrapped/New Data.csv`**, stopping once it reaches the newest posts of the latest `N Old Cleaned.csv`, which are the last batch you uploaded. On the first run, with no batch yet, it fetches everything X returns. If a liked post has no video of its own but links to one (`x.com/<user>/status/<id>/video/<n>`), it looks up that post and uses its video; the row keeps the liked post's id and text. |
+| 0 | `fetch/fetch_likes.py` | Downloads your likes (newest first) into **`scrapped/New Data.csv`**, stopping once it reaches the newest posts of the latest `N Old Cleaned.csv`, which are the last batch you uploaded. As a safety cap it stops after 1000 likes (`--limit` changes it); if it gets there without finding the last batch, it fails so the run stops before uploading. On a first run, with no batch yet, it just keeps the newest 1000. If a liked post has no video of its own but links to one (`x.com/<user>/status/<id>/video/<n>`), it looks up that post and uses its video; the row keeps the liked post's id and text. |
 | 1 | `pipeline/run_all_pipes.py` | Runs Pipe 1–7 inside `scrapped/` and produces `New Cleaned.csv`, which is then renamed to **`Cleaned.csv`** and validated. If there are 0 new rows, the run stops here. |
 | 2 | `upload/upload_videos.py` | Sends every row of `Cleaned.csv` to the bot chat and forwards it to the archive channel. Each video and attempt is logged to MongoDB, and failures go to `failed_uploads/failed_uploads_<time>.csv`. |
 | — | *(archive)* | Copies `Cleaned.csv` to **`scrapped/<N+1> Old Cleaned.csv`**, which the next run uses as its anchor. |
@@ -75,7 +75,8 @@ Run these from the project root. The `-m` form is required because the scripts i
 ```sh
 python -m fetch.fetch_likes                            # fetch new likes into scrapped/New Data.csv
 python -m fetch.fetch_likes --max-pages 1              #   ...just the newest page (quick login test)
-python -m fetch.fetch_likes --all                      #   ...every like, ignoring the last batch
+python -m fetch.fetch_likes --limit 3000               #   ...raise the safety cap (default: stop after 1000 likes)
+python -m fetch.fetch_likes --all                      #   ...every like, ignoring the last batch (no cap)
 python -m fetch.fetch_likes --save-raw                 #   ...also dump raw API pages to scrapped/response.json
 python pipeline/run_all_pipes.py                       # pipeline only (writes scrapped/New Cleaned.csv)
 python -m upload.upload_videos                         # upload scrapped/Cleaned.csv
