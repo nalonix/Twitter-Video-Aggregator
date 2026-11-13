@@ -1,7 +1,7 @@
 """
 run_full_workflow.py — the one command for a full upload run. See WORKFLOW.md.
 
-    python run_full_workflow.py [--skip-tags]
+    python run_full_workflow.py [--no-fetch] [--skip-tags]
 
 Retrying failed uploads is a separate command: python retry_failed.py
 """
@@ -402,12 +402,15 @@ def write_reports(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Pipeline → upload → archive → backfill → tag stats")
+    parser = argparse.ArgumentParser(description="Fetch likes → pipeline → upload → archive → backfill → tag stats")
+    parser.add_argument(
+        "--no-fetch", action="store_true", help="use the existing scrapped/New Data.csv instead of fetching likes from X"
+    )
     parser.add_argument("--skip-tags", action="store_true", help="don't recalculate tag stats/relationships")
     args = parser.parse_args()
 
-    if not NEW_DATA.exists():
-        raise SystemExit(f"❌ {NEW_DATA} not found. Export your likes to it first (see WORKFLOW.md).")
+    if args.no_fetch and not NEW_DATA.exists():
+        raise SystemExit(f"❌ {NEW_DATA} not found. Export your likes to it first, or drop --no-fetch.")
 
     REPORTS_DIR.mkdir(exist_ok=True)
     run_stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -427,6 +430,15 @@ if __name__ == "__main__":
         raise SystemExit(f"\n❌ {message}")
 
     print("⚙️ Running full workflow...\n", flush=True)
+
+    # ── 0. Fetch likes from X: → New Data.csv ───────────────────────────────────
+    if not args.no_fetch:
+        code, log = run_step("Step 0/5 — Fetch likes from X (fetch/fetch_likes.py)", py + ["-m", "fetch.fetch_likes"], ROOT)
+        logs.append(("fetch", log))
+        if code != 0:
+            abort(f"Fetching likes failed with exit code {code}. Fix it, or run with --no-fetch to use the existing New Data.csv.")
+    else:
+        print("\n⏭ Step 0/5 — Fetch skipped (--no-fetch); using the existing New Data.csv.", flush=True)
 
     # ── 1. Data pipeline: New Data.csv → Cleaned.csv ────────────────────────────
     code, log = run_step(

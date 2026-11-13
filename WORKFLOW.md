@@ -1,6 +1,6 @@
 # Upload Workflow
 
-One command takes a fresh export of liked posts, cleans it, uploads the videos to Telegram, records everything in MongoDB, retries failures, and writes a report.
+One command fetches your new liked posts from X, cleans them, uploads the videos to Telegram, records everything in MongoDB, retries failures, and writes a report.
 
 ```sh
 venv\Scripts\activate
@@ -9,18 +9,22 @@ python run_full_workflow.py
 
 The steps always run with `venv\Scripts\python.exe`, even if you start the script with your global Python.
 
-## Before each run
+## Before the first run
 
-1. Export your liked posts (newest first) to **`scrapped/New Data.csv`**, overwriting the old one.
-   The export must include the newest batch you already uploaded, because Pipe 1 cuts the new rows off above it.
-2. Make sure `core/constants.py` exists (copy `core/constants.example.py` and fill it in).
+1. Make sure `core/constants.py` exists (copy `core/constants.example.py` and fill it in).
+2. Paste your X login cookies into it once. Open x.com in your browser while logged in, go to DevTools → Application → Cookies → `https://x.com`, and copy:
+   - `auth_token` → `X_AUTH_TOKEN`
+   - `ct0` → `X_CT0`
 
-That's it. Don't rename or archive anything by hand; the workflow does that now.
+   They last until you log out of that browser session or change your password. If X rotates `ct0`, the fetcher saves the new value for you. When the session does die, the run stops with "X session expired"; paste fresh cookies and re-run.
+
+That's it. Don't export, rename or archive anything by hand; the workflow does that now.
 
 ## What `run_full_workflow.py` does
 
 | Step | Script | What happens |
 |---|---|---|
+| 0 | `fetch/fetch_likes.py` | Downloads your likes (newest first) into **`scrapped/New Data.csv`**, stopping once it reaches the newest posts of the latest `N Old Cleaned.csv`, which are the last batch you uploaded. On the first run, with no batch yet, it fetches everything X returns. If a liked post has no video of its own but links to one (`x.com/<user>/status/<id>/video/<n>`), it looks up that post and uses its video; the row keeps the liked post's id and text. |
 | 1 | `pipeline/run_all_pipes.py` | Runs Pipe 1–7 inside `scrapped/` and produces `New Cleaned.csv`, which is then renamed to **`Cleaned.csv`** and validated. If there are 0 new rows, the run stops here. |
 | 2 | `upload/upload_videos.py` | Sends every row of `Cleaned.csv` to the bot chat and forwards it to the archive channel. Each video and attempt is logged to MongoDB, and failures go to `failed_uploads/failed_uploads_<time>.csv`. |
 | — | *(archive)* | Copies `Cleaned.csv` to **`scrapped/<N+1> Old Cleaned.csv`**, which the next run uses as its anchor. |
@@ -32,9 +36,10 @@ At the end it writes **`reports/run_<time>/run_report.html`** (embedded failed p
 
 Options:
 
+- `--no-fetch`: skip step 0 and use the `scrapped/New Data.csv` that's already there (e.g. a manual export). The file must include the newest batch you already uploaded, because Pipe 1 cuts the new rows off above it.
 - `--skip-tags`: skip steps 4–5 (they scan the whole collection and are the slowest part).
 
-If step 1 or 2 fails, the run stops and still writes a report. If step 2 crashes partway through, `Cleaned.csv` is **not** archived, so check the bot chat for videos that were already posted before you re-run. Steps 3–5 log a warning and the run keeps going.
+If step 0, 1 or 2 fails, the run stops and still writes a report. If step 2 crashes partway through, `Cleaned.csv` is **not** archived, so check the bot chat for videos that were already posted before you re-run. Steps 3–5 log a warning and the run keeps going.
 
 ## Retrying failed uploads (separate command)
 
@@ -68,6 +73,10 @@ All pipes read and write `scrapped/New Cleaned.csv` in place:
 Run these from the project root. The `-m` form is required because the scripts import from `core/`.
 
 ```sh
+python -m fetch.fetch_likes                            # fetch new likes into scrapped/New Data.csv
+python -m fetch.fetch_likes --max-pages 1              #   ...just the newest page (quick login test)
+python -m fetch.fetch_likes --all                      #   ...every like, ignoring the last batch
+python -m fetch.fetch_likes --save-raw                 #   ...also dump raw API pages to scrapped/response.json
 python pipeline/run_all_pipes.py                       # pipeline only (writes scrapped/New Cleaned.csv)
 python -m upload.upload_videos                         # upload scrapped/Cleaned.csv
 python -m maintenance.back_fill_url                    # backfill from the latest "N Old Cleaned.csv"
@@ -83,12 +92,13 @@ python -m maintenance.tag_relationships
 run_full_workflow.py     entry point (this document)
 retry_failed.py          retry failed uploads (separate command)
 core/                    config + shared modules
-  constants.py             secrets: Telegram token/chat ids, MongoDB URI (gitignored)
+  constants.py             secrets: Telegram token/chat ids, MongoDB URI, X cookies (gitignored)
   constants.example.py     template for constants.py
   db.py                    mongoengine connection (import it to connect)
   bot.py                   telepot bot instance
   models.py                Video, Tag, TrialLog, TagRelationship
   generate_title.py        spaCy title generator used in captions
+fetch/                   fetch_likes.py (downloads your likes from X into New Data.csv)
 pipeline/                Pipe 1–7 + run_all_pipes.py + common.py
 upload/                  upload_videos.py, send_x_videos.py, video_logger.py,
                          grab_vids.py (reads Cleaned.csv), failed_uploads_logger.py
